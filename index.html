@@ -1,0 +1,1067 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editor por agrupamento</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #eef3f8;
+      --surface: #ffffff;
+      --surface-soft: #f8fbff;
+      --line: #c9d5e3;
+      --ink: #172033;
+      --muted: #62748a;
+      --primary: #146ef5;
+      --primary-dark: #0b5fd8;
+      --danger: #b42318;
+      --tree: #edf5ff;
+      --shadow: 0 16px 36px rgba(23, 32, 51, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+      padding: 18px;
+      gap: 14px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .brand-logo {
+      width: min(260px, 34vw);
+      height: auto;
+      display: block;
+      flex: 0 0 auto;
+    }
+
+    .title-copy {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+    }
+
+    #statusText {
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    input[type="file"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    button,
+    .file-button {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #174ea6;
+      background: #eaf1fb;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover,
+    .file-button:hover {
+      background: #dbe8f8;
+    }
+
+    .primary {
+      color: #ffffff;
+      background: var(--primary);
+    }
+
+    .primary:hover {
+      background: var(--primary-dark);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 14px;
+      min-height: 0;
+    }
+
+    aside,
+    .table-shell {
+      background: var(--surface);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    aside {
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    label,
+    .section-title {
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    select,
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      color: var(--ink);
+      background: #fff;
+      font: inherit;
+    }
+
+    .check {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 14px;
+      color: #344256;
+      line-height: 1.35;
+    }
+
+    .check input {
+      width: 17px;
+      height: 17px;
+      margin-top: 2px;
+      accent-color: var(--primary);
+    }
+
+    .button-stack {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 14px;
+    }
+
+    .width-row {
+      display: grid;
+      grid-template-columns: 82px 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .width-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .summary {
+      border-top: 1px solid var(--line);
+      margin-top: 14px;
+      padding-top: 14px;
+      color: #344256;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+
+    .table-shell {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      min-height: 0;
+      background: #fff;
+    }
+
+    table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      table-layout: fixed;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      min-width: 110px;
+      border-right: 1px solid #e5edf5;
+      border-bottom: 1px solid #e5edf5;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #dde7f2;
+      color: #243247;
+      font-weight: 800;
+    }
+
+    tr:nth-child(even) td {
+      background: var(--surface-soft);
+    }
+
+    td[contenteditable="true"] {
+      cursor: text;
+    }
+
+    td[contenteditable="true"]:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: -2px;
+      background: #fff;
+    }
+
+    .tree-cell {
+      min-width: 320px;
+      font-weight: 700;
+      background: var(--tree);
+    }
+
+    .level-1 td {
+      background: var(--tree) !important;
+      font-weight: 800;
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border-top: 1px solid var(--line);
+      background: var(--bg);
+      color: var(--muted);
+    }
+
+    .pager {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .empty {
+      display: grid;
+      place-items: center;
+      min-height: 420px;
+      padding: 30px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      max-width: 360px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: #fff;
+      background: #172033;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        padding: 12px;
+      }
+
+      header,
+      .title-wrap,
+      .footer {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .brand-logo {
+        width: min(320px, 100%);
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        max-height: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title-wrap">
+        <img class="brand-logo" src="assets/Loram_Corporate-3.png" alt="Loram">
+        <div class="title-copy">
+          <h1>Editor por agrupamento</h1>
+          <span id="statusText">Abra uma planilha para comecar.</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <label class="file-button" for="fileInput">Abrir Excel</label>
+        <input id="fileInput" type="file" accept=".xlsx,.xlsm,.xls,.csv">
+        <button id="saveButton" class="primary" type="button" disabled>Salvar como</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside>
+        <div class="field">
+          <span class="section-title">Arquivo</span>
+          <span id="fileLabel">Nenhum arquivo selecionado</span>
+        </div>
+
+        <div class="field">
+          <label for="sheetSelect">Aba</label>
+          <select id="sheetSelect" disabled></select>
+        </div>
+
+        <div class="field">
+          <label for="globalFilter">Filtro geral</label>
+          <input id="globalFilter" type="text" placeholder="Buscar em todas as colunas" disabled>
+        </div>
+
+        <div class="field">
+          <label for="columnSelect">Filtro por coluna</label>
+          <select id="columnSelect" disabled></select>
+          <input id="columnFilter" type="text" placeholder="Texto da coluna" disabled>
+        </div>
+
+        <label class="check">
+          <input id="groupEnabled" type="checkbox" disabled>
+          <span>Estrutura pela coluna A</span>
+        </label>
+
+        <label class="check">
+          <input id="keepParents" type="checkbox" checked disabled>
+          <span>Manter pais nos filtros</span>
+        </label>
+
+        <div class="button-stack">
+          <button id="expandAll" type="button" disabled>Expandir tudo</button>
+          <button id="collapseAll" type="button" disabled>Recolher tudo</button>
+        </div>
+
+        <div class="field">
+          <label for="widthColumn">Largura das colunas</label>
+          <select id="widthColumn" disabled></select>
+          <span class="hint">Escolha uma coluna, digite a largura em pixels e aplique. Use "Todas as colunas" para padronizar a grade.</span>
+          <div class="width-row">
+            <input id="columnWidth" type="number" min="60" max="800" step="10" value="180" aria-label="Largura em pixels" disabled>
+            <button id="applyWidth" type="button" disabled>Aplicar</button>
+          </div>
+          <div class="width-actions">
+            <button id="compactWidth" type="button" disabled>Compacta</button>
+            <button id="wideWidth" type="button" disabled>Ampla</button>
+          </div>
+          <button id="autoFit" type="button" disabled>Auto ajustar colunas</button>
+        </div>
+
+        <div class="button-stack">
+          <button id="clearFilters" type="button" disabled>Limpar filtros</button>
+          <button id="reloadSheet" type="button" disabled>Recarregar aba</button>
+        </div>
+
+        <div id="summary" class="summary"></div>
+      </aside>
+
+      <section class="table-shell">
+        <div id="tableWrap" class="table-wrap">
+          <div class="empty">
+            <div>
+              <strong>Carregue uma planilha Excel para editar.</strong><br>
+              Esta versao roda no navegador e exporta um novo arquivo .xlsx.
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <div class="pager">
+            <button id="previousPage" type="button" disabled>Anterior</button>
+            <button id="nextPage" type="button" disabled>Proxima</button>
+            <span id="pageLabel">Pagina 1 de 1</span>
+          </div>
+          <span>Duplo clique ou clique em uma celula para editar.</span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const PAGE_SIZE = 300;
+
+    const state = {
+      workbook: null,
+      fileName: "",
+      sheetName: "",
+      rows: [],
+      originalRows: [],
+      columns: [],
+      filteredRows: [],
+      matchedCount: 0,
+      page: 0,
+      dirty: false,
+      widths: {},
+      collapsed: new Set(),
+      structureIssueCount: 0,
+      structureMaxDepth: 0,
+      structureRootCount: 0
+    };
+
+    const els = {
+      fileInput: document.querySelector("#fileInput"),
+      saveButton: document.querySelector("#saveButton"),
+      statusText: document.querySelector("#statusText"),
+      fileLabel: document.querySelector("#fileLabel"),
+      sheetSelect: document.querySelector("#sheetSelect"),
+      globalFilter: document.querySelector("#globalFilter"),
+      columnSelect: document.querySelector("#columnSelect"),
+      columnFilter: document.querySelector("#columnFilter"),
+      groupEnabled: document.querySelector("#groupEnabled"),
+      keepParents: document.querySelector("#keepParents"),
+      expandAll: document.querySelector("#expandAll"),
+      collapseAll: document.querySelector("#collapseAll"),
+      widthColumn: document.querySelector("#widthColumn"),
+      columnWidth: document.querySelector("#columnWidth"),
+      applyWidth: document.querySelector("#applyWidth"),
+      compactWidth: document.querySelector("#compactWidth"),
+      wideWidth: document.querySelector("#wideWidth"),
+      autoFit: document.querySelector("#autoFit"),
+      clearFilters: document.querySelector("#clearFilters"),
+      reloadSheet: document.querySelector("#reloadSheet"),
+      tableWrap: document.querySelector("#tableWrap"),
+      previousPage: document.querySelector("#previousPage"),
+      nextPage: document.querySelector("#nextPage"),
+      pageLabel: document.querySelector("#pageLabel"),
+      summary: document.querySelector("#summary"),
+      toast: document.querySelector("#toast")
+    };
+
+    function showToast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add("show");
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => els.toast.classList.remove("show"), 2600);
+    }
+
+    function displayValue(value) {
+      if (value === null || value === undefined) return "";
+      return String(value);
+    }
+
+    function cleanFirstColumnValue(value) {
+      const text = displayValue(value).trim();
+      const decimalNumber = text.match(/^(-?\d+)[.,]\d+$/);
+      if (decimalNumber) return decimalNumber[1];
+      return text;
+    }
+
+    function cleanHeader(value, fallback) {
+      const text = displayValue(value).replace(/\s+/g, " ").trim();
+      return text || fallback;
+    }
+
+    function escapeHtml(value) {
+      return displayValue(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function referenceLevel(value) {
+      const text = displayValue(value).trim();
+      if (!text) return 1;
+      const dotMatch = text.match(/^\.+/);
+      if (dotMatch) return Math.max(Math.floor(dotMatch[0].length / 2) + 1, 1);
+      const digits = text.replace(/\D/g, "");
+      if (digits) return Math.max(parseInt(digits, 10), 1);
+      return 1;
+    }
+
+    function detectHeaderRow(matrix) {
+      const limit = Math.min(matrix.length, 60);
+      for (let index = 0; index < limit; index += 1) {
+        const labels = (matrix[index] || []).map((value) => cleanHeader(value, ""));
+        const filled = labels.filter(Boolean);
+        if (filled.length >= 3 && labels[0] === "Level" && labels.includes("Quantity")) return index;
+        if (filled.length >= 3 && labels[0] === "Quantity") return index;
+      }
+      return 0;
+    }
+
+    function matrixToRows(matrix) {
+      const headerRow = detectHeaderRow(matrix);
+      const headers = (matrix[headerRow] || []).map((value, index) => cleanHeader(value, `Coluna ${index + 1}`));
+      const width = headers.length;
+      const rows = matrix.slice(headerRow + 1).map((row, rowIndex) => {
+        const values = {};
+        headers.forEach((header, columnIndex) => {
+          values[header] = columnIndex === 0 ? cleanFirstColumnValue(row[columnIndex]) : displayValue(row[columnIndex]);
+        });
+        return { id: rowIndex, values };
+      });
+
+      return {
+        columns: headers.slice(0, width),
+        rows
+      };
+    }
+
+    function setControlsEnabled(enabled) {
+      [
+        els.saveButton,
+        els.sheetSelect,
+        els.globalFilter,
+        els.columnSelect,
+        els.columnFilter,
+        els.groupEnabled,
+        els.keepParents,
+        els.expandAll,
+        els.collapseAll,
+        els.widthColumn,
+        els.columnWidth,
+        els.applyWidth,
+        els.compactWidth,
+        els.wideWidth,
+        els.autoFit,
+        els.clearFilters,
+        els.reloadSheet
+      ].forEach((element) => {
+        element.disabled = !enabled;
+      });
+    }
+
+    function fillSelect(select, values, selected) {
+      select.innerHTML = values.map((value) => {
+        const safe = escapeHtml(value);
+        const isSelected = value === selected ? " selected" : "";
+        return `<option value="${safe}"${isSelected}>${safe}</option>`;
+      }).join("");
+    }
+
+    async function openWorkbook(file) {
+      if (!window.XLSX) {
+        showToast("Biblioteca XLSX nao carregou. Verifique a conexao com a internet.");
+        return;
+      }
+
+      const buffer = await file.arrayBuffer();
+      state.workbook = XLSX.read(buffer, { type: "array", cellDates: false });
+      state.fileName = file.name;
+      state.sheetName = state.workbook.SheetNames[0] || "";
+      els.fileLabel.textContent = state.fileName;
+      fillSelect(els.sheetSelect, state.workbook.SheetNames, state.sheetName);
+      loadSheet();
+      setControlsEnabled(true);
+      showToast("Planilha carregada.");
+    }
+
+    function loadSheet() {
+      if (!state.workbook || !state.sheetName) return;
+
+      const sheet = state.workbook.Sheets[state.sheetName];
+      const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+      const parsed = matrixToRows(matrix);
+      state.columns = parsed.columns;
+      state.rows = parsed.rows;
+      state.originalRows = JSON.parse(JSON.stringify(parsed.rows));
+      state.filteredRows = parsed.rows;
+      state.matchedCount = parsed.rows.length;
+      state.page = 0;
+      state.dirty = false;
+      state.widths = {};
+      state.collapsed.clear();
+      fillSelect(els.columnSelect, ["Todas as colunas", ...state.columns], "Todas as colunas");
+      fillSelect(els.widthColumn, ["Todas as colunas", "Estrutura", ...state.columns], "Todas as colunas");
+      applyFilters();
+    }
+
+    function rowMatches(row) {
+      const term = els.globalFilter.value.trim().toLowerCase();
+      const column = els.columnSelect.value;
+      const columnTerm = els.columnFilter.value.trim().toLowerCase();
+
+      if (term) {
+        const anyMatch = state.columns.some((col) => displayValue(row.values[col]).toLowerCase().includes(term));
+        if (!anyMatch) return false;
+      }
+
+      if (columnTerm && state.columns.includes(column)) {
+        return displayValue(row.values[column]).toLowerCase().includes(columnTerm);
+      }
+
+      return true;
+    }
+
+    function indicesWithAncestors(maskedIds) {
+      if (!state.columns.length) return maskedIds;
+      const refCol = state.columns[0];
+      const selected = new Set(maskedIds);
+      const levels = new Map(state.rows.map((row) => [row.id, referenceLevel(row.values[refCol])]));
+
+      [...selected].forEach((id) => {
+        let currentLevel = levels.get(id) || 1;
+        if (currentLevel < 2) return;
+        const position = state.rows.findIndex((row) => row.id === id);
+        for (let index = position - 1; index >= 0; index -= 1) {
+          const previous = state.rows[index];
+          const previousLevel = levels.get(previous.id) || 1;
+          if (previousLevel < currentLevel) {
+            selected.add(previous.id);
+            currentLevel = previousLevel;
+            if (currentLevel < 2) break;
+          }
+        }
+      });
+
+      return state.rows.filter((row) => selected.has(row.id)).map((row) => row.id);
+    }
+
+    function applyFilters() {
+      if (!state.rows.length) {
+        renderEmpty();
+        return;
+      }
+
+      const matchedRows = state.rows.filter(rowMatches);
+      state.matchedCount = matchedRows.length;
+
+      if (els.groupEnabled.checked && els.keepParents.checked && matchedRows.length !== state.rows.length) {
+        const ids = new Set(indicesWithAncestors(matchedRows.map((row) => row.id)));
+        state.filteredRows = state.rows.filter((row) => ids.has(row.id));
+      } else {
+        state.filteredRows = matchedRows;
+      }
+
+      state.page = Math.min(state.page, maxPage());
+      renderTable();
+    }
+
+    function maxPage() {
+      if (els.groupEnabled.checked) return 0;
+      return Math.max(Math.ceil(state.filteredRows.length / PAGE_SIZE) - 1, 0);
+    }
+
+    function visibleRows() {
+      if (els.groupEnabled.checked) return buildVisibleTreeRows();
+      const start = state.page * PAGE_SIZE;
+      return state.filteredRows.slice(start, start + PAGE_SIZE);
+    }
+
+    function buildVisibleTreeRows() {
+      if (!state.columns.length) return [];
+      const refCol = state.columns[0];
+      const visible = [];
+      const parents = [];
+      state.structureIssueCount = 0;
+      state.structureMaxDepth = 0;
+      state.structureRootCount = 0;
+
+      state.filteredRows.forEach((row) => {
+        const level = referenceLevel(row.values[refCol]);
+        state.structureMaxDepth = Math.max(state.structureMaxDepth, level);
+        if (level === 1) state.structureRootCount += 1;
+        while (parents.length && parents[parents.length - 1].level >= level) parents.pop();
+        const parentHidden = parents.some((item) => state.collapsed.has(item.id) || item.hidden);
+        const hasParent = parents.length > 0;
+        if (level > 1 && !hasParent) state.structureIssueCount += 1;
+        const hidden = parentHidden;
+        visible.push({ row, level, hidden });
+        parents.push({ id: row.id, level, hidden });
+      });
+
+      return visible.filter((item) => !item.hidden);
+    }
+
+    function hasChildren(rowId, level, allTreeRows) {
+      const index = allTreeRows.findIndex((item) => item.row.id === rowId);
+      for (let i = index + 1; i < allTreeRows.length; i += 1) {
+        if (allTreeRows[i].level <= level) return false;
+        if (allTreeRows[i].level === level + 1) return true;
+      }
+      return false;
+    }
+
+    function renderEmpty() {
+      els.tableWrap.innerHTML = `
+        <div class="empty">
+          <div><strong>Carregue uma planilha Excel para editar.</strong><br>Esta versao roda no navegador e exporta um novo arquivo .xlsx.</div>
+        </div>
+      `;
+      updateSummary();
+    }
+
+    function columnStyle(column) {
+      const width = state.widths[column];
+      return width ? ` style="width:${width}px;min-width:${width}px;max-width:${width}px"` : "";
+    }
+
+    function widthDeclaration(column) {
+      const width = state.widths[column];
+      return width ? `width:${width}px;min-width:${width}px;max-width:${width}px;` : "";
+    }
+
+    function renderTable() {
+      if (!state.columns.length) {
+        renderEmpty();
+        return;
+      }
+
+      if (els.groupEnabled.checked) {
+        renderGroupedTable();
+      } else {
+        renderFlatTable();
+      }
+      updateSummary();
+    }
+
+    function renderFlatTable() {
+      const rows = visibleRows();
+      const head = state.columns.map((column) => `<th${columnStyle(column)}>${escapeHtml(column)}</th>`).join("");
+      const body = rows.map((row) => {
+        const cells = state.columns.map((column) => {
+          return `<td contenteditable="true" data-row="${row.id}" data-column="${escapeHtml(column)}"${columnStyle(column)}>${escapeHtml(row.values[column])}</td>`;
+        }).join("");
+        return `<tr>${cells}</tr>`;
+      }).join("");
+
+      els.tableWrap.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+    }
+
+    function renderGroupedTable() {
+      const allTreeRows = [];
+      const refCol = state.columns[0];
+      const parents = [];
+
+      state.filteredRows.forEach((row) => {
+        const level = referenceLevel(row.values[refCol]);
+        while (parents.length && parents[parents.length - 1].level >= level) parents.pop();
+        const hidden = parents.some((item) => state.collapsed.has(item.id) || item.hidden);
+        allTreeRows.push({ row, level, hidden });
+        parents.push({ id: row.id, level, hidden });
+      });
+
+      const visible = buildVisibleTreeRows();
+      const head = [
+        `<th class="tree-cell"${columnStyle("Estrutura")}>Estrutura</th>`,
+        ...state.columns.map((column) => `<th${columnStyle(column)}>${escapeHtml(column)}</th>`)
+      ].join("");
+
+      const body = visible.map((item) => {
+        const row = item.row;
+        const level = item.level;
+        const children = hasChildren(row.id, level, allTreeRows);
+        const collapsed = state.collapsed.has(row.id);
+        const symbol = children ? (collapsed ? "+" : "-") : "";
+        const descriptionColumn = state.columns[2] || state.columns[1] || refCol;
+        const label = [displayValue(row.values[refCol]), displayValue(row.values[descriptionColumn])]
+          .filter(Boolean)
+          .join("  ");
+        const treeCell = `
+          <td class="tree-cell" data-toggle="${children ? row.id : ""}" style="padding-left:${10 + (level - 1) * 18}px;${widthDeclaration("Estrutura")}">
+            ${symbol ? `<button type="button" data-toggle="${row.id}" aria-label="Alternar linha">${symbol}</button>` : "<span style='display:inline-block;width:38px'></span>"}
+            ${escapeHtml(label)}
+          </td>
+        `;
+        const cells = state.columns.map((column) => {
+          return `<td contenteditable="true" data-row="${row.id}" data-column="${escapeHtml(column)}"${columnStyle(column)}>${escapeHtml(row.values[column])}</td>`;
+        }).join("");
+        return `<tr class="level-${level}">${treeCell}${cells}</tr>`;
+      }).join("");
+
+      els.tableWrap.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+    }
+
+    function updateSummary() {
+      const total = state.rows.length;
+      const filtered = state.filteredRows.length;
+      const mode = els.groupEnabled.checked ? "estrutura coluna A" : "editavel";
+      const dirty = state.dirty ? "Alteracoes nao salvas." : "Sem alteracoes pendentes.";
+      let filterLine = `Apos filtros: ${filtered}`;
+      let structureLine = "";
+
+      if (els.groupEnabled.checked) {
+        if (els.keepParents.checked && state.matchedCount !== filtered) {
+          filterLine = `Itens filtrados: ${state.matchedCount}\nCom pais: ${filtered}`;
+        }
+        structureLine = `\nRaizes: ${state.structureRootCount}\nProfundidade: ${state.structureMaxDepth}\nQuebras de hierarquia: ${state.structureIssueCount}`;
+      }
+
+      els.summary.textContent = `Modo: ${mode}\nLinhas originais: ${total}\n${filterLine}\nNa grade: ${visibleRows().length}${structureLine}\n${dirty}`;
+      els.statusText.textContent = state.fileName ? `${state.fileName} - ${dirty}` : "Abra uma planilha para comecar.";
+      els.pageLabel.textContent = `Pagina ${state.page + 1} de ${maxPage() + 1}`;
+      els.previousPage.disabled = !state.rows.length || state.page <= 0 || els.groupEnabled.checked;
+      els.nextPage.disabled = !state.rows.length || state.page >= maxPage() || els.groupEnabled.checked;
+    }
+
+    function editCell(cell) {
+      const rowId = Number(cell.dataset.row);
+      const column = cell.dataset.column;
+      const row = state.rows.find((item) => item.id === rowId);
+      if (!row || !state.columns.includes(column)) return;
+      const value = column === state.columns[0] ? cleanFirstColumnValue(cell.textContent) : cell.textContent;
+      row.values[column] = value;
+      state.dirty = true;
+      applyFilters();
+    }
+
+    function applyColumnWidth() {
+      const selected = els.widthColumn.value;
+      const width = Math.max(60, Math.min(Number(els.columnWidth.value) || 180, 800));
+      applyWidthToSelection(selected, width);
+    }
+
+    function applyWidthToSelection(selected, width) {
+      if (selected === "Todas as colunas") {
+        ["Estrutura", ...state.columns].forEach((column) => {
+          state.widths[column] = width;
+        });
+      } else {
+        state.widths[selected] = width;
+      }
+      renderTable();
+    }
+
+    function setQuickWidth(width) {
+      els.columnWidth.value = width;
+      applyWidthToSelection(els.widthColumn.value, width);
+    }
+
+    function syncWidthInput() {
+      const selected = els.widthColumn.value;
+      if (state.widths[selected]) {
+        els.columnWidth.value = state.widths[selected];
+      }
+    }
+
+    function autoFitColumns() {
+      const sample = state.filteredRows.slice(0, 500);
+      state.columns.forEach((column) => {
+        const lengths = [column.length, ...sample.map((row) => displayValue(row.values[column]).length)];
+        state.widths[column] = Math.min(Math.max(Math.max(...lengths) * 8 + 34, 90), 520);
+      });
+      state.widths.Estrutura = Math.min(Math.max((state.widths[state.columns[0]] || 180) + 80, 180), 620);
+      renderTable();
+    }
+
+    function exportWorkbook() {
+      if (!state.rows.length || !window.XLSX) return;
+      const data = state.rows.map((row) => {
+        const output = {};
+        state.columns.forEach((column) => {
+          output[column] = row.values[column];
+        });
+        return output;
+      });
+      const sheet = XLSX.utils.json_to_sheet(data, { header: state.columns });
+      const workbook = XLSX.utils.book_new();
+      const safeSheetName = (state.sheetName || "Planilha").slice(0, 31);
+      XLSX.utils.book_append_sheet(workbook, sheet, safeSheetName);
+      const baseName = (state.fileName || "planilha").replace(/\.[^.]+$/, "");
+      XLSX.writeFile(workbook, `${baseName}_editado.xlsx`);
+      state.dirty = false;
+      updateSummary();
+      showToast("Arquivo exportado.");
+    }
+
+    els.fileInput.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (file) openWorkbook(file).catch((error) => showToast(`Erro ao abrir arquivo: ${error.message}`));
+    });
+
+    els.sheetSelect.addEventListener("change", () => {
+      if (state.dirty && !confirm("Existem alteracoes nao salvas. Trocar de aba mesmo assim?")) {
+        els.sheetSelect.value = state.sheetName;
+        return;
+      }
+      state.sheetName = els.sheetSelect.value;
+      loadSheet();
+    });
+
+    [els.globalFilter, els.columnFilter].forEach((input) => {
+      input.addEventListener("input", () => {
+        state.page = 0;
+        applyFilters();
+      });
+    });
+
+    [els.columnSelect, els.groupEnabled, els.keepParents].forEach((input) => {
+      input.addEventListener("change", () => {
+        if (input === els.groupEnabled && !els.groupEnabled.checked && els.widthColumn.value === "Estrutura") {
+          els.widthColumn.value = "Todas as colunas";
+          syncWidthInput();
+        }
+        state.page = 0;
+        applyFilters();
+      });
+    });
+
+    els.widthColumn.addEventListener("change", syncWidthInput);
+
+    els.tableWrap.addEventListener("focusout", (event) => {
+      const cell = event.target.closest("td[contenteditable='true']");
+      if (cell) editCell(cell);
+    });
+
+    els.tableWrap.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && event.target.matches("td[contenteditable='true']")) {
+        event.preventDefault();
+        event.target.blur();
+      }
+    });
+
+    els.tableWrap.addEventListener("click", (event) => {
+      const toggle = event.target.closest("[data-toggle]");
+      if (!toggle || !toggle.dataset.toggle) return;
+      const id = Number(toggle.dataset.toggle);
+      if (state.collapsed.has(id)) state.collapsed.delete(id);
+      else state.collapsed.add(id);
+      renderTable();
+    });
+
+    els.previousPage.addEventListener("click", () => {
+      if (state.page > 0) {
+        state.page -= 1;
+        renderTable();
+      }
+    });
+
+    els.nextPage.addEventListener("click", () => {
+      if (state.page < maxPage()) {
+        state.page += 1;
+        renderTable();
+      }
+    });
+
+    els.clearFilters.addEventListener("click", () => {
+      els.globalFilter.value = "";
+      els.columnSelect.value = "Todas as colunas";
+      els.columnFilter.value = "";
+      els.groupEnabled.checked = false;
+      state.page = 0;
+      applyFilters();
+    });
+
+    els.reloadSheet.addEventListener("click", () => {
+      if (state.dirty && !confirm("Existem alteracoes nao salvas. Recarregar mesmo assim?")) return;
+      loadSheet();
+    });
+
+    els.expandAll.addEventListener("click", () => {
+      state.collapsed.clear();
+      renderTable();
+    });
+
+    els.collapseAll.addEventListener("click", () => {
+      if (!els.groupEnabled.checked) return;
+      state.filteredRows.forEach((row) => state.collapsed.add(row.id));
+      renderTable();
+    });
+
+    els.applyWidth.addEventListener("click", applyColumnWidth);
+    els.compactWidth.addEventListener("click", () => setQuickWidth(120));
+    els.wideWidth.addEventListener("click", () => setQuickWidth(260));
+    els.autoFit.addEventListener("click", autoFitColumns);
+    els.saveButton.addEventListener("click", exportWorkbook);
+
+    window.addEventListener("beforeunload", (event) => {
+      if (!state.dirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    });
+  </script>
+</body>
+</html>
